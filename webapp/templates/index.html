@@ -41,6 +41,6 @@
   {% endfor %}
 </table>
 <p><form class="inline" method="post" action="{{ url_for('delete_outputs') }}" onsubmit="return confirm('Delete all game output files (logs and stats)?')"><button class="btn-small" type="submit">Delete all output files</button></form>
-<span class="muted">Outputs are the *Log.xlsx / *Stats.xlsx / *DStats.xlsx files the simulator writes.</span></p>
+<span class="muted">Removes leftover *Log.xlsx / *Stats.xlsx / *DStats.xlsx files from this folder. Finished games keep their own copies under History.</span></p>
 {% endif %}
 {% endblock %}

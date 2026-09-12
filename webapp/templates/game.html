@@ -8,7 +8,7 @@
     <div class="muted">Timeouts: {{ state.home_timeouts }}</div>
   </div>
   <div class="mid">
-    <div>{% if state.ot_series %}OT series {{ state.ot_series }}{% else %}Qtr {{ state.quarter }}{% endif %} &nbsp; <strong>{{ state.clock }}</strong>{% if state.two_minute %} <span class="warn">2 MIN</span>{% endif %}</div>
+    <div>{% if state.over %}<strong>FINAL</strong>{% elif state.ot_series %}OT series {{ state.ot_series }}{% else %}Qtr {{ state.quarter }} &nbsp; <strong>{{ state.clock }}</strong>{% endif %}{% if state.two_minute and not state.over %} <span class="warn">2 MIN</span>{% endif %}</div>
     <div>Down <strong>{{ state.down }}</strong> &nbsp; To go <strong>{{ state.ytg }}</strong> &nbsp; Ball on <strong>{{ state.ballon }}</strong></div>
   </div>
   <div style="text-align:right">
@@ -25,6 +25,7 @@
   <div class="ball" style="left: {{ 8.33 + pct * 0.8333 }}%"></div>
 </div>
 
+{% if state.over %}<div class="flash"><strong>Game over.</strong> Press <em>Quit / compile stats</em> to save the result and the stats workbooks, or <em>Undo last action</em>.</div>{% endif %}
 <div class="muted">Play call: {{ state.play_call or '—' }}</div>
 <div class="last">{{ state.last_result }}</div>
 

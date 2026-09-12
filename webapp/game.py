@@ -80,6 +80,8 @@ class Game:
         self.finished = False
         self.output_files = []
         self.ot_possessions_done = 0
+        self.ot_possession_over = False
+        self._action_in_ot = False
         self.over = False
         self.last_turn = None
         self.last_quit = None
@@ -297,20 +299,63 @@ class Game:
             raise GameError("Game is over")
         if action not in self.ACTIONS:
             raise GameError("Unknown action %s" % action)
+        if self.over:
+            # The engine keeps playing "quarter 5, 6, ..." if asked, so stop here.
+            bus.reset_turn()
+            self.messages = [("Game Over", "The game is over. Press Quit / compile stats, or Undo last action.")]
+            return {"messages": self.messages, "results": [], "error": None}
+        refusal = self._ot_refusal(action)
+        if refusal:
+            bus.reset_turn()
+            self.messages = [("Overtime", refusal)]
+            return {"messages": self.messages, "results": [], "error": None}
         for k in self.boxes:
             self.boxes[k] = 1 if boxes.get(k) else 0
         self.journal.append([action, sorted(k for k in self.boxes if self.boxes[k])])
         self.save_journal("in_progress")
         bus.reset_turn()
         error = None
+        self._action_in_ot = self.GM['OTFlag'] == 1
         try:
             getattr(self, action)()
         except Exception:
             error = traceback.format_exc()
+        if not self._action_in_ot and self.GM['OTFlag'] == 1:
+            # Regulation just ended tied.  The last regulation play can leave a
+            # stale change-of-possession flag; overtime starts clean.
+            self.GM['CoPFlag'] = self.GM['ConversionFlag'] = self.GM['TDFlag'] = 0
+            self.Kicking['KickoffFlag'] = self.Kicking['KickFlag'] = 0
+            self.ot_possession_over = False
         for r in bus.results:
             self.log.append(r)
         self.messages = list(bus.messages)
+        if any("Game Over" in t or "Game Over" in m for t, m in self.messages):
+            self.over = True
         return {"messages": self.messages, "results": list(bus.results), "error": error}
+
+    def _ot_refusal(self, action):
+        """Overtime button rules, enforced here because the engine does not.
+
+        Returns a notice for a button that makes no sense right now, else None.
+        Refused presses are not journaled, so Undo skips them.
+        """
+        GM = self.GM
+        if GM['OTFlag'] != 1:
+            return None
+        if action == "ot":
+            if self.ot_possession_over:
+                return None
+            if GM['TDFlag'] == 1:
+                return "Try the conversion first: press XPt or Go For 2."
+            return ("This possession is still going. Keep pressing Call Play; press OT after a "
+                    "touchdown and conversion, a field goal try, or a turnover.")
+        if self.ot_possession_over:
+            return "This overtime possession is over. Press OT to start the next one."
+        if action == "kickoff":
+            return "There are no kickoffs in overtime. Press Call Play, or OT when the possession is over."
+        if action == "punt":
+            return "There is no punting in overtime. Press Call Play or FG."
+        return None
 
     def call_play(self):
         GM, GO, K = self.GM, self.GameOptions, self.Kicking
@@ -366,6 +411,8 @@ class Game:
             if self.GM['CoPFlag'] == 1 and self.GM['OTFlag'] == 0:
                 p.CoP()
                 self._reset_boxes()
+            elif self.GM['CoPFlag'] == 1 and self._action_in_ot:
+                self.ot_possession_over = True      # turnover in overtime
         p.DisplayManagement()
         p.LogPlay(self.HTMDA, self.VTMDA, self.HTDMDA, self.VTDMDA)
         self._take_logs(p)
@@ -405,6 +452,8 @@ class Game:
             return
         p = self._play()
         p.FieldGoal()
+        if K['FGFlag'] == 1 and self._action_in_ot:
+            self.ot_possession_over = True
         if K['FGFlag'] == 1:
             p.GameManagement()
             p.DisplayManagement()
@@ -420,6 +469,7 @@ class Game:
             bus.messages.append(("Overtime", "On or after the 3rd series, and after a TD, the scoring team must go for 2 points"))
             return
         GO['ForcePlay'] = self.boxes["ForcePlay"]
+        attempted = GM['TDFlag'] == 1
         p = self._play()
         p.ExtraPoint()
         p.GameManagement()
@@ -431,9 +481,15 @@ class Game:
         K['XPtFlag'] = 0
         GM['TDFlag'] = 0
         K['KickoffFlag'] = 1
+        if attempted and self._action_in_ot:
+            self.ot_possession_over = True
 
     def go_for_two(self):
         GM, K = self.GM, self.Kicking
+        if GM['TDFlag'] == 0:
+            # Play.GoForTwoPoints has no such check and would award 2 points.
+            bus.messages.append(("Error", "No TD Scored. Don't press this button"))
+            return
         p = self._play()
         p.GoForTwoPoints()
         p.GameManagement()
@@ -441,6 +497,8 @@ class Game:
         GM['ConversionFlag'] = 0
         GM['TDFlag'] = 0
         K['KickoffFlag'] = 1
+        if self._action_in_ot:
+            self.ot_possession_over = True
 
     def punt(self):
         GM, GO, K = self.GM, self.GameOptions, self.Kicking
@@ -482,6 +540,7 @@ class Game:
             bus.messages.append(("Button Press Infraction", "Only press this button after the 1st OT Possession"))
             return
         p = self._play()
+        self.ot_possession_over = False
         self.ot_possessions_done += 1
         if self.ot_possessions_done % 2 == 0:      # series complete
             bus.results.append("End of OT series %d: %s %d, %s %d" % (
@@ -490,7 +549,9 @@ class Game:
             if GM['HomeTeamScore'] != GM['VisitingTeamScore']:
                 bus.messages.append(("Game Over", "Press Quit / compile stats"))
                 self.over = True
-            GM['OTSeries'] += 1                     # loser of the toss starts the next series: no CoP
+                p.DisplayManagement()
+                return
+            GM['OTSeries'] += 1                     # second team of this series starts the next one: no CoP
         else:
             p.CoP()                                 # second possession of the series
         GM['YardLine'], GM['AdjustedYardLine'] = 75, 25
@@ -504,15 +565,14 @@ class Game:
 
     # -------------------------------------------------------------- autoplay
     def game_over(self):
-        return self.over or any("Game Over" in m[0] or "Game Over" in m[1] for m in self.messages)
+        return self.over
 
     def auto_action(self):
         """A naive coach: kick when required, punt or try a FG on 4th and long."""
         gm, k = self.GM, self.Kicking
         if gm['OTFlag'] == 1:
-            last = self.journal[-1][0] if self.journal else ""
-            if last == "fg" or k['KickoffFlag'] == 1 or gm['CoPFlag'] == 1:
-                return "ot"                       # possession over: FG try, conversion done, or turnover
+            if self.ot_possession_over:
+                return "ot"
             if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
                 return "go_for_two" if gm['OTSeries'] >= 3 else "xpt"
             if gm['Down'] == 4 and gm['YTG'] > 2 and gm['YardLine'] >= 65:
@@ -591,5 +651,5 @@ class Game:
             "play_call": b.get("play_call", ""), "last_result": b.get("last_result", ""),
             "ball_yardline": bus.ball["yardline"], "ball_offense_flag": bus.ball["offense_flag"],
             "boxes": dict(self.boxes), "log": list(self.log), "messages": list(self.messages),
-            "finished": self.finished, "id": self.id, "can_undo": bool(self.journal),
+            "finished": self.finished, "id": self.id, "can_undo": bool(self.journal), "over": self.over,
         }
