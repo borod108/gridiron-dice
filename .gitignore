@@ -6,3 +6,6 @@ webapp/deploy/.state
 *.xlsx
 !webapp/sample_data/*.xlsx
 General Info.txt
+
+# temporary demo data (see demo_data/INVENTORY.md)
+demo_data/

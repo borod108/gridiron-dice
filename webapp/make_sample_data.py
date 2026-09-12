@@ -1,6 +1,9 @@
 """Generate synthetic team stat workbooks in the exact layout the simulator reads.
 
-Usage:  python3 make_sample_data.py [output_dir]
+Usage:  python3 make_sample_data.py [output_dir] [TeamName ...]
+
+With no team names it writes SampleHome.xlsx and SampleAway.xlsx.  Each team's
+numbers come from a seed derived from its name, so reruns are identical.
 
 Builds the sheet skeleton with the original StatsWorksheet class (so section
 labels land where PickAPlayer.FindStats expects them) and then fills the rows
@@ -198,8 +201,15 @@ def build_team(team, out_dir, seed):
         os.chdir(cwd)
 
 
+def seed_for(name):
+    """Stable per-name seed (hash() is randomised per process in Python 3)."""
+    return sum((i + 1) * ord(ch) for i, ch in enumerate(name))
+
+
 if __name__ == "__main__":
     out = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "data"))
     os.makedirs(out, exist_ok=True)
-    for team, seed in (("SampleHome", 1), ("SampleAway", 2)):
+    team_names = sys.argv[2:]
+    pairs = [(n, seed_for(n)) for n in team_names] if team_names else [("SampleHome", 1), ("SampleAway", 2)]
+    for team, seed in pairs:
         print("wrote", build_team(team, out, seed))
