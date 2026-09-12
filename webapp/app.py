@@ -24,6 +24,7 @@ os.chdir(DATA_DIR)   # the engine reads/writes workbooks relative to cwd
 
 import game  # noqa: E402  (after chdir so nothing else depends on cwd)
 import history  # noqa: E402
+import backup  # noqa: E402
 
 app = Flask(__name__, template_folder=os.path.join(HERE, "templates"),
             static_folder=os.path.join(HERE, "static"))
@@ -269,7 +270,16 @@ def game_end():
             return redirect(url_for("index"))
         if not g.finished:
             g.last_quit = g.quit()
+            if backup.BUCKET:   # off-box copy of every finished game
+                threading.Thread(target=_safe_backup, daemon=True).start()
     return redirect(url_for("game_page"))
+
+
+def _safe_backup():
+    try:
+        backup.backup()
+    except Exception as e:
+        app.logger.warning("backup failed: %s", e)
 
 
 @app.route("/game/abandon", methods=["POST"])

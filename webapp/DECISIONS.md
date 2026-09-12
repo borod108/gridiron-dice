@@ -85,3 +85,10 @@ Recorded so they can be revisited. Numbered for reference.
     required, punt/FG on 4th and long) until the engine reports Game Over.
     Every action goes through the journal, so Undo works afterwards. The
     coach is deliberately dumb; it is for getting a result, not for strategy.
+17. **Backups to S3.** `backup.py` tars the whole data directory (teams,
+    games/, history.sqlite) to a private bucket `gridiron-dice-backup-<account>`
+    after every finished game and daily at 03:00 UTC via a systemd timer,
+    keeping the newest 30. The instance gets an IAM role scoped to that one
+    bucket; no keys on the box. `backup.py restore <key>` brings a copy back.
+    Whole-directory snapshots were chosen over per-file sync for simplicity;
+    the data is small. `deploy/enable-backup.sh` sets it up and is re-runnable.

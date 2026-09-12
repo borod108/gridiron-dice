@@ -18,8 +18,11 @@ if [ -z "$(ls -A /opt/rick/data 2>/dev/null)" ]; then cp /opt/rick/app/sample_da
 /opt/rick/venv/bin/pip install -q -r /opt/rick/app/requirements.txt
 chown -R rick:rick /opt/rick
 install -m 644 /opt/rick/app/deploy/rick-web.service /etc/systemd/system/rick-web.service
+install -m 644 /opt/rick/app/deploy/rick-backup.service /etc/systemd/system/rick-backup.service
+install -m 644 /opt/rick/app/deploy/rick-backup.timer /etc/systemd/system/rick-backup.timer
 systemctl daemon-reload
 systemctl enable rick-web >/dev/null
+systemctl enable --now rick-backup.timer >/dev/null
 systemctl restart rick-web
 sleep 2
 systemctl --no-pager --lines=5 status rick-web || true

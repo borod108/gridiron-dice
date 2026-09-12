@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up gridiron-dice data directory to S3
+
+[Service]
+Type=oneshot
+User=rick
+WorkingDirectory=/opt/rick/app
+EnvironmentFile=/opt/rick/env
+Environment=RICK_DATA_DIR=/opt/rick/data
+ExecStart=/opt/rick/venv/bin/python3 backup.py backup
