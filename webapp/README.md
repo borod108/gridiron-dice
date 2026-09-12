@@ -1,6 +1,9 @@
 # Rick's College Football Simulator — web version
 
-Minimal Flask front end over the original simulator engine. See DECISIONS.md.
+Minimal Flask front end over the original simulator engine.
+
+- How to use it: [MANUAL.md](MANUAL.md)
+- Why it is built this way: [DECISIONS.md](DECISIONS.md)
 
 ## Run locally
     cd webapp

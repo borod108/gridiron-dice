@@ -8,3 +8,5 @@ lookup tables weighted by real team statistics kept in Excel workbooks.
 - `webapp/`: Python 3 web version (Flask) that reuses the engine unchanged and
   deploys to a single EC2 instance. See `webapp/README.md` and
   `webapp/DECISIONS.md`.
+
+User manual for the web version: [webapp/MANUAL.md](webapp/MANUAL.md).
