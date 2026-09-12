@@ -76,3 +76,8 @@ Recorded so they can be revisited. Numbered for reference.
     Cost: undo replays the whole game (well under a second for a full game).
     Any future change to the engine's random call sequence invalidates old
     journals, which only matters for games in progress at the time.
+15. **Bulk data in and out.** The upload form accepts a .zip (unpacked and
+    flattened server-side, same .xlsx/.txt filter, paths stripped) or a whole
+    folder via the browser's folder picker. "Download everything" returns a
+    zip of the data directory including games/ and the history database. No
+    chunked/resumable upload; the request limit stays 50 MB.

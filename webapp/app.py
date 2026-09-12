@@ -3,10 +3,12 @@
 Run:  RICK_DATA_DIR=/path/to/data RICK_PASSWORD=secret python3 app.py
 or under gunicorn (see deploy/).  Single game at a time, single process.
 """
+import io
 import os
 import re
 import secrets
 import threading
+import zipfile
 from datetime import datetime
 from functools import wraps
 
@@ -90,19 +92,67 @@ def index():
                            game=g, state=g.state() if g else None)
 
 
+def _unzip(stream):
+    """Yield (name, bytes) for acceptable members of an uploaded zip, flattening folders."""
+    with zipfile.ZipFile(stream) as z:
+        for m in z.infolist():
+            if m.is_dir() or m.file_size > app.config["MAX_CONTENT_LENGTH"]:
+                continue
+            base = os.path.basename(m.filename)
+            if base.startswith("~$") or base.startswith("."):
+                continue
+            yield base, z.read(m)
+
+
 @app.route("/upload", methods=["POST"])
 def upload():
-    n = 0
-    for f in request.files.getlist("files"):
+    n, skipped = 0, []
+    for f in request.files.getlist("files") + request.files.getlist("folder"):
+        if not f.filename:
+            continue
+        if f.filename.lower().endswith(".zip"):
+            try:
+                members = list(_unzip(io.BytesIO(f.read())))
+            except zipfile.BadZipFile:
+                skipped.append(f.filename)
+                continue
+            for name, data in members:
+                clean = clean_name(name)
+                if not clean:
+                    skipped.append(name)
+                    continue
+                with open(os.path.join(DATA_DIR, clean), "wb") as out:
+                    out.write(data)
+                n += 1
+            continue
         name = clean_name(f.filename)
         if not name:
-            flash("Skipped %s (only .xlsx and .txt files are accepted)" % (f.filename or "unnamed"))
+            skipped.append(f.filename)
             continue
         f.save(os.path.join(DATA_DIR, name))
         n += 1
     if n:
         flash("Uploaded %d file(s)" % n)
+    if skipped:
+        flash("Skipped %d file(s) that are not .xlsx or .txt: %s" % (len(skipped), ", ".join(skipped[:8])))
     return redirect(url_for("index"))
+
+
+@app.route("/download-all")
+def download_all():
+    """Zip of every data file plus the games/ folder (history included)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, dirs, files in os.walk(DATA_DIR):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for f in files:
+                if f.startswith(".") or f.endswith(".tmp"):
+                    continue
+                full = os.path.join(root, f)
+                z.write(full, os.path.relpath(full, DATA_DIR))
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype="application/zip",
+                    headers={"Content-Disposition": "attachment; filename=gridiron-dice-data.zip"})
 
 
 @app.route("/files/<path:name>")

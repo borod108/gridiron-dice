@@ -19,13 +19,14 @@
 {% endif %}
 
 <h2>Upload data</h2>
-<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="row">
-  <input type="file" name="files" multiple accept=".xlsx,.txt" required>
-  <button type="submit">Upload</button>
-  <span class="muted">Team stat workbooks (.xlsx). Existing files with the same name are replaced.</span>
+<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+  <div class="row"><label>Files or a .zip <input type="file" name="files" multiple accept=".xlsx,.txt,.zip"></label></div>
+  <div class="row"><label>…or a whole folder <input type="file" name="folder" webkitdirectory multiple></label></div>
+  <div class="row"><button type="submit">Upload</button>
+  <span class="muted">Team stat workbooks (.xlsx). Zips are unpacked; folders are flattened; other file types are skipped. Existing files with the same name are replaced.</span></div>
 </form>
 
-<h2>Files</h2>
+<h2>Files <a class="btn-small" href="{{ url_for('download_all') }}">Download everything (zip)</a></h2>
 {% if not files %}<p class="muted">No files yet.</p>{% else %}
 <table>
   <tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th><th></th></tr>
