@@ -30,7 +30,8 @@ if ! aws iam get-instance-profile --instance-profile-name "$ROLE" >/dev/null 2>&
   aws iam add-role-to-instance-profile --instance-profile-name "$ROLE" --role-name "$ROLE"
   sleep 10   # IAM propagation
 fi
-if [ -z "$(aws ec2 describe-iam-instance-profile-associations --filters Name=instance-id,Values=$INSTANCE_ID Name=state,Values=associated --query 'IamInstanceProfileAssociations[0].AssociationId')" ] ; then
+ASSOC=$(aws ec2 describe-iam-instance-profile-associations --filters Name=instance-id,Values=$INSTANCE_ID Name=state,Values=associated --query 'IamInstanceProfileAssociations[0].AssociationId')
+if [ -z "$ASSOC" ] || [ "$ASSOC" = "None" ]; then
   aws ec2 associate-iam-instance-profile --instance-id "$INSTANCE_ID" --iam-instance-profile Name="$ROLE" >/dev/null
   echo "attached $ROLE to $INSTANCE_ID"
 fi

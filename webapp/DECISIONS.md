@@ -92,3 +92,11 @@ Recorded so they can be revisited. Numbered for reference.
     bucket; no keys on the box. `backup.py restore <key>` brings a copy back.
     Whole-directory snapshots were chosen over per-file sync for simplicity;
     the data is small. `deploy/enable-backup.sh` sets it up and is re-runnable.
+18. **Python 3.12 shim for `random`.** The instance runs Ubuntu 24.04 / Python
+    3.12, which rejects the integral floats (from `round(x, 0)`) the engine
+    passes to `random.randint`; 3.10/3.11 accepted them. `engine/compat.py`
+    wraps `randint`/`randrange` to coerce integral floats and is imported
+    before the engine. Chosen over editing dozens of call sites so the engine
+    stays diff-free against the desktop code. Caught only on the server:
+    local testing was on 3.10, so `simulate.py` is now also run on the
+    instance after every push (see push.sh).

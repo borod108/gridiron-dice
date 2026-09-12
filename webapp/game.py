@@ -22,6 +22,7 @@ ENGINE = os.path.join(HERE, "engine")
 if ENGINE not in sys.path:
     sys.path.insert(0, ENGINE)
 
+import compat                                   # noqa: E402,F401  (must precede engine imports)
 from openpyxl import Workbook, load_workbook   # noqa: E402
 import bus                                      # noqa: E402
 import GeneralInfoFile                          # noqa: E402
