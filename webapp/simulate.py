@@ -18,23 +18,9 @@ def run_one(home, visitor, seed, verbose=False):
     g = game.Game(home, visitor)
     errors = []
     steps = 0
-    while steps < 400:
+    while steps < 400 and not g.game_over():
         steps += 1
-        s = g.state()
-        msgs = " ".join(m[0] + ":" + m[1] for m in g.messages)
-        if "Game Over" in msgs:
-            break
-        gm = g.GM
-        if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
-            act = "xpt"
-        elif g.Kicking['KickoffFlag'] == 1 or ((gm['Quarter'] in (1, 3)) and gm['TimeLeftinQuarter'] == 900):
-            act = "kickoff"
-        elif gm['Down'] == 4 and gm['YTG'] > 2:
-            act = "fg" if gm['YardLine'] >= 65 else "punt"
-        elif gm['OTFlag'] == 1 and gm['Down'] == 1 and gm['YardLine'] == 75 and gm['OTPossession'] > 1 and s["play_call"] in ("", None):
-            act = "ot"
-        else:
-            act = "call_play"
+        act = g.auto_action()
         r = g.do(act, {})
         if verbose:
             s = g.state()

@@ -81,3 +81,7 @@ Recorded so they can be revisited. Numbered for reference.
     folder via the browser's folder picker. "Download everything" returns a
     zip of the data directory including games/ and the history database. No
     chunked/resumable upload; the request limit stays 50 MB.
+16. **Auto-play button.** Runs the naive coach from the test harness (kick when
+    required, punt/FG on 4th and long) until the engine reports Game Over.
+    Every action goes through the journal, so Undo works afterwards. The
+    coach is deliberately dumb; it is for getting a result, not for strategy.

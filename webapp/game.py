@@ -473,6 +473,34 @@ class Game:
         p.OTManagement()
         p.DisplayManagement()
 
+    # -------------------------------------------------------------- autoplay
+    def game_over(self):
+        return any("Game Over" in m[0] or "Game Over" in m[1] for m in self.messages)
+
+    def auto_action(self):
+        """A naive coach: kick when required, punt or try a FG on 4th and long."""
+        gm = self.GM
+        if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
+            return "xpt"
+        if self.Kicking['KickoffFlag'] == 1 or (gm['Quarter'] in (1, 3) and gm['TimeLeftinQuarter'] == 900):
+            return "kickoff"
+        if gm['Down'] == 4 and gm['YTG'] > 2:
+            return "fg" if gm['YardLine'] >= 65 else "punt"
+        if gm['OTFlag'] == 1 and gm['Down'] == 1 and gm['YardLine'] == 75 and gm['OTPossession'] > 1 \
+                and not bus.board.get("play_call"):
+            return "ot"
+        return "call_play"
+
+    def autoplay(self, max_actions=400):
+        """Run the naive coach until the engine says the game is over."""
+        n = 0
+        while n < max_actions and not self.game_over():
+            r = self.do(self.auto_action(), {})
+            n += 1
+            if r["error"]:
+                return n, r
+        return n, self.last_turn
+
     def quit(self):
         """QuitGame(): compile stats and write the log files.  Returns output file names."""
         bus.reset_turn()

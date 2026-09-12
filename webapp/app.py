@@ -235,6 +235,18 @@ def game_action():
     return redirect(url_for("game_page"))
 
 
+@app.route("/game/autoplay", methods=["POST"])
+def game_autoplay():
+    with LOCK:
+        g = current_game()
+        if g is None or g.finished:
+            return redirect(url_for("index"))
+        n, last = g.autoplay()
+        g.last_turn = last
+        flash("Auto-played %d actions" % n)
+    return redirect(url_for("game_page"))
+
+
 @app.route("/game/undo", methods=["POST"])
 def game_undo():
     with LOCK:
