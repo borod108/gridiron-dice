@@ -82,6 +82,7 @@ class Game:
         self.ot_possessions_done = 0
         self.ot_possession_over = False
         self._action_in_ot = False
+        self.free_kick_due = False
         self.over = False
         self.last_turn = None
         self.last_quit = None
@@ -305,10 +306,15 @@ class Game:
             self.messages = [("Game Over", "The game is over. Press Quit / compile stats, or Undo last action.")]
             return {"messages": self.messages, "results": [], "error": None}
         refusal = self._ot_refusal(action)
+        title = "Overtime"
+        if refusal is None:
+            refusal, title = self._sequence_refusal(action), "Button Press Infraction"
         if refusal:
             bus.reset_turn()
-            self.messages = [("Overtime", refusal)]
+            self.messages = [(title, refusal)]
             return {"messages": self.messages, "results": [], "error": None}
+        if action == "kickoff" and self.free_kick_due:
+            boxes = dict(boxes, FK=1)            # the kick after a safety is a free kick
         for k in self.boxes:
             self.boxes[k] = 1 if boxes.get(k) else 0
         self.journal.append([action, sorted(k for k in self.boxes if self.boxes[k])])
@@ -316,10 +322,17 @@ class Game:
         bus.reset_turn()
         error = None
         self._action_in_ot = self.GM['OTFlag'] == 1
+        scores_before = (self.GM['HomeTeamScore'], self.GM['VisitingTeamScore'])
         try:
             getattr(self, action)()
         except Exception:
             error = traceback.format_exc()
+        if action == "kickoff":
+            self.free_kick_due = False
+        elif action in ("call_play", "punt") and not self._action_in_ot:
+            gained = max(self.GM['HomeTeamScore'] - scores_before[0], self.GM['VisitingTeamScore'] - scores_before[1])
+            if gained == 2:                      # only a safety scores 2 on a play; the engine sets no flag for it
+                self.free_kick_due = True
         if not self._action_in_ot and self.GM['OTFlag'] == 1:
             # Regulation just ended tied.  The last regulation play can leave a
             # stale change-of-possession flag; overtime starts clean.
@@ -328,7 +341,9 @@ class Game:
             self.ot_possession_over = False
         for r in bus.results:
             self.log.append(r)
-        self.messages = list(bus.messages)
+        # The engine's end-of-game pop-up says "Press OK to Quit"; there is no OK button here.
+        self.messages = [("Game Over", "Press Quit / compile stats") if (t, m) == ("Game Over.", "Press OK to Quit") else (t, m)
+                         for t, m in bus.messages]
         if any("Game Over" in t or "Game Over" in m for t, m in self.messages):
             self.over = True
         return {"messages": self.messages, "results": list(bus.results), "error": error}
@@ -355,6 +370,33 @@ class Game:
             return "There are no kickoffs in overtime. Press Call Play, or OT when the possession is over."
         if action == "punt":
             return "There is no punting in overtime. Press Call Play or FG."
+        return None
+
+    def _sequence_refusal(self, action):
+        """Regulation order of buttons around scores and halves.
+
+        The engine checks some of this inside Call Play only; other buttons ran
+        anyway (XPt with no touchdown forced a kickoff, Kickoff was accepted
+        mid-drive, Punt after a 4th-down touchdown).  Refused presses change
+        nothing and are not journaled.
+        """
+        GM, K = self.GM, self.Kicking
+        if GM['OTFlag'] == 1 or action in ("hto", "vto", "ot"):
+            return None
+        if GM['TDFlag'] == 1:
+            if action in ("xpt", "go_for_two", "kickoff"):
+                return None
+            return "After a touchdown, press XPt or Go For 2, then Kickoff."
+        if self.free_kick_due:
+            return None if action == "kickoff" else "After a safety, press Kickoff for the free kick."
+        if GM['ConversionFlag'] == 1 or K['KickoffFlag'] == 1:
+            return None if action == "kickoff" else "Only press the Kickoff Button"
+        if GM['Quarter'] in (1, 3) and GM['TimeLeftinQuarter'] == 900:
+            return None if action == "kickoff" else "Press the Kickoff Button"
+        if action == "kickoff":
+            return "Kickoffs happen at the start of each half and after a score."
+        if action in ("xpt", "go_for_two"):
+            return "No TD Scored. Don't press this button"
         return None
 
     def call_play(self):
@@ -468,6 +510,10 @@ class Game:
         if GM['OTFlag'] == 1 and GM['OTSeries'] >= 3:
             bus.messages.append(("Overtime", "On or after the 3rd series, and after a TD, the scoring team must go for 2 points"))
             return
+        if GM['TDFlag'] == 0:
+            # Play.ExtraPoint refuses, but the rest of this handler used to run and demand a kickoff.
+            bus.messages.append(("Error", "No TD Scored. Don't press this button"))
+            return
         GO['ForcePlay'] = self.boxes["ForcePlay"]
         attempted = GM['TDFlag'] == 1
         p = self._play()
@@ -570,6 +616,8 @@ class Game:
     def auto_action(self):
         """A naive coach: kick when required, punt or try a FG on 4th and long."""
         gm, k = self.GM, self.Kicking
+        if self.free_kick_due:
+            return "kickoff"
         if gm['OTFlag'] == 1:
             if self.ot_possession_over:
                 return "ot"
@@ -578,10 +626,10 @@ class Game:
             if gm['Down'] == 4 and gm['YTG'] > 2 and gm['YardLine'] >= 65:
                 return "fg"
             return "call_play"                    # never punt in OT
-        if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
+        if gm['TDFlag'] == 1:
             return "xpt"
-        if k['KickoffFlag'] == 1 or (gm['Quarter'] in (1, 3) and gm['TimeLeftinQuarter'] == 900):
-            return "kickoff"
+        if gm['ConversionFlag'] == 1 or k['KickoffFlag'] == 1 or (gm['Quarter'] in (1, 3) and gm['TimeLeftinQuarter'] == 900):
+            return "kickoff"                      # after a field goal the engine sets ConversionFlag without TDFlag
         if gm['Down'] == 4 and gm['YTG'] > 2:
             return "fg" if gm['YardLine'] >= 65 else "punt"
         return "call_play"
@@ -633,6 +681,19 @@ class Game:
         self.save_journal("abandoned")
 
     # ------------------------------------------------------------------ state
+    @staticmethod
+    def _side(yardline):
+        """YardLine counts from the offense's own goal line: <50 own half, >50 opponent's."""
+        try:
+            y = int(yardline)
+        except (TypeError, ValueError):
+            return ""
+        if 0 < y < 50:
+            return "own"
+        if 50 < y < 100:
+            return "opp"
+        return ""
+
     def state(self):
         GM, b = self.GM, bus.board
 
@@ -645,6 +706,7 @@ class Game:
             "home_score": GM['HomeTeamScore'], "visitor_score": GM['VisitingTeamScore'],
             "quarter": GM['Quarter'], "clock": clock(),
             "down": GM['Down'], "ytg": b.get("ytg", GM['YTG']), "ballon": GM['AdjustedYardLine'],
+            "ballon_side": self._side(GM['YardLine']),
             "home_timeouts": GM['HomeTimeouts'], "visitor_timeouts": GM['VisitorTimeouts'],
             "offense": "home" if GM['OffenseFlag'] == 0 else "visitor",
             "ot_series": b.get("ot_series", ""), "two_minute": b.get("two_minute", False),

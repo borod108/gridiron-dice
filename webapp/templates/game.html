@@ -9,7 +9,7 @@
   </div>
   <div class="mid">
     <div>{% if state.over %}<strong>FINAL</strong>{% elif state.ot_series %}OT series {{ state.ot_series }}{% else %}Qtr {{ state.quarter }} &nbsp; <strong>{{ state.clock }}</strong>{% endif %}{% if state.two_minute and not state.over %} <span class="warn">2 MIN</span>{% endif %}</div>
-    <div>Down <strong>{{ state.down }}</strong> &nbsp; To go <strong>{{ state.ytg }}</strong> &nbsp; Ball on <strong>{{ state.ballon }}</strong></div>
+    <div>Down <strong>{{ state.down }}</strong> &nbsp; To go <strong>{{ state.ytg }}</strong> &nbsp; Ball on <strong>{{ state.ballon_side }} {{ state.ballon }}</strong></div>
   </div>
   <div style="text-align:right">
     <div class="team">{{ state.visitor }} <span class="muted">VISITOR</span><span class="light {% if state.offense == 'visitor' %}on{% endif %}" style="margin-left:6px"></span></div>

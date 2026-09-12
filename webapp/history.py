@@ -98,7 +98,7 @@ def get_game(gid):
     g["files"] = json.loads(g["files"] or "[]")
     d = game_dir(gid)
     if os.path.isdir(d):   # trust the folder over the index
-        g["files"] = sorted(f for f in os.listdir(d) if not f.startswith("."))
+        g["files"] = sorted(f for f in os.listdir(d) if f.endswith(".xlsx"))   # hide journal.json
     return g
 
 
