@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+webapp/data/
+webapp/deploy/.env
+webapp/deploy/.state
+*.xlsx
+!webapp/sample_data/*.xlsx
+General Info.txt
