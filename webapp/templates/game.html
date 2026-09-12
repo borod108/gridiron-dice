@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ state.home }} vs {{ state.visitor }}{% endblock %}
+{% block body %}
+<div class="board">
+  <div>
+    <div class="team"><span class="light {% if state.offense == 'home' %}on{% endif %}"></span>{{ state.home }} <span class="muted">HOME</span></div>
+    <div class="score">{{ state.home_score }}</div>
+    <div class="muted">Timeouts: {{ state.home_timeouts }}</div>
+  </div>
+  <div class="mid">
+    <div>{% if state.ot_series %}OT series {{ state.ot_series }}{% else %}Qtr {{ state.quarter }}{% endif %} &nbsp; <strong>{{ state.clock }}</strong>{% if state.two_minute %} <span class="warn">2 MIN</span>{% endif %}</div>
+    <div>Down <strong>{{ state.down }}</strong> &nbsp; To go <strong>{{ state.ytg }}</strong> &nbsp; Ball on <strong>{{ state.ballon }}</strong></div>
+  </div>
+  <div style="text-align:right">
+    <div class="team">{{ state.visitor }} <span class="muted">VISITOR</span><span class="light {% if state.offense == 'visitor' %}on{% endif %}" style="margin-left:6px"></span></div>
+    <div class="score">{{ state.visitor_score }}</div>
+    <div class="muted">Timeouts: {{ state.visitor_timeouts }}</div>
+  </div>
+</div>
+{# field: yardline is distance from the offense's own goal; draw home moving right, visitor moving left #}
+{% set yl = state.ball_yardline if state.ball_yardline is number else 25 %}
+{% set pct = (yl if state.ball_offense_flag == 0 else 100 - yl) %}
+<div class="field" title="Ball on {{ state.ballon }}">
+  {% for i in range(1, 10) %}<div class="tick" style="left: {{ 8.33 + i * 8.33 }}%"></div>{% endfor %}
+  <div class="ball" style="left: {{ 8.33 + pct * 0.8333 }}%"></div>
+</div>
+
+<div class="muted">Play call: {{ state.play_call or '—' }}</div>
+<div class="last">{{ state.last_result }}</div>
+
+{% if last %}
+  {% for t, m in last.messages %}<div class="msg"><strong>{{ t }}</strong> — {{ m }}</div>{% endfor %}
+  {% if last.error %}<div class="err">Engine error (game state may be inconsistent):
+{{ last.error }}</div>{% endif %}
+{% endif %}
+
+<form method="post" action="{{ url_for('game_action') }}">
+  <fieldset><legend>Plays</legend>
+  <div class="row">
+    <button name="action" value="kickoff">Kickoff</button>
+    <button name="action" value="call_play"><strong>Call Play</strong></button>
+    <button name="action" value="punt">Punt</button>
+    <button name="action" value="fg">FG</button>
+    <button name="action" value="xpt">XPt</button>
+    <button name="action" value="go_for_two">Go For 2</button>
+    <button name="action" value="hto">HTO</button>
+    <button name="action" value="vto">VTO</button>
+    <button name="action" value="ot">OT</button>
+  </div>
+  </fieldset>
+  <fieldset class="boxes"><legend>Options (same checkboxes as the desktop scoreboard)</legend>
+    {% for key, label in boxes %}<label><input type="checkbox" name="box" value="{{ key }}" {% if state.boxes[key] %}checked{% endif %}> {{ label }}</label>{% endfor %}
+  </fieldset>
+</form>
+
+<div class="row" style="margin-top:8px">
+  <form method="post" action="{{ url_for('game_end') }}" onsubmit="return confirm('End the game and compile stats?')"><button>Quit / compile stats</button></form>
+  <form method="post" action="{{ url_for('game_abandon') }}" onsubmit="return confirm('Discard this game without compiling stats?')"><button>Abandon game</button></form>
+</div>
+
+<h2>Play log</h2>
+<div class="log">
+  {% for line in state.log | reverse %}<div>{{ line }}</div>{% endfor %}
+</div>
+{% endblock %}

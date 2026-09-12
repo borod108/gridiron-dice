@@ -1,0 +1,4 @@
+data/
+deploy/.state
+deploy/.env
+__pycache__/

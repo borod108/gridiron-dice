@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Rick's College Football Simulator</h1>
+
+{% if game and not game.finished %}
+<div class="flash">Game in progress: {{ state.home }} {{ state.home_score }} – {{ state.visitor }} {{ state.visitor_score }}, Q{{ state.quarter }} {{ state.clock }}.
+  <a href="{{ url_for('game_page') }}">Continue</a></div>
+{% endif %}
+
+<h2>Start a game</h2>
+{% if teams|length < 2 %}
+<p class="muted">Upload at least two team workbooks (e.g. <code>USC.xlsx</code>, <code>UCLA.xlsx</code>) to start a game.</p>
+{% else %}
+<form method="post" action="{{ url_for('start') }}" class="row">
+  <label>Home <select name="home">{% for t in teams %}<option>{{ t }}</option>{% endfor %}</select></label>
+  <label>Visitor <select name="visitor">{% for t in teams %}<option {% if loop.index == 2 %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+  <button type="submit">Start game</button>
+</form>
+{% endif %}
+
+<h2>Upload data</h2>
+<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="row">
+  <input type="file" name="files" multiple accept=".xlsx,.txt" required>
+  <button type="submit">Upload</button>
+  <span class="muted">Team stat workbooks (.xlsx). Existing files with the same name are replaced.</span>
+</form>
+
+<h2>Files</h2>
+{% if not files %}<p class="muted">No files yet.</p>{% else %}
+<table>
+  <tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th><th></th></tr>
+  {% for f in files %}
+  <tr>
+    <td><a href="{{ url_for('download', name=f.name) }}">{{ f.name }}</a></td>
+    <td>{{ f.kind }}</td>
+    <td>{{ (f.size / 1024) | round(1) }} KB</td>
+    <td>{{ f.mtime }}</td>
+    <td><form class="inline" method="post" action="{{ url_for('delete', name=f.name) }}" onsubmit="return confirm('Delete {{ f.name }}?')"><button class="btn-small" type="submit">Delete</button></form></td>
+  </tr>
+  {% endfor %}
+</table>
+<p><form class="inline" method="post" action="{{ url_for('delete_outputs') }}" onsubmit="return confirm('Delete all game output files (logs and stats)?')"><button class="btn-small" type="submit">Delete all output files</button></form>
+<span class="muted">Outputs are the *Log.xlsx / *Stats.xlsx / *DStats.xlsx files the simulator writes.</span></p>
+{% endif %}
+{% endblock %}

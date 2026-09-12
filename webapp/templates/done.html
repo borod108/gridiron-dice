@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Final: {{ result.final_score if result else (state.home ~ ' ' ~ state.home_score ~ ' – ' ~ state.visitor ~ ' ' ~ state.visitor_score) }}</h1>
+{% if result and result.error %}<div class="err">Stats compilation hit an error (files listed below may be partial):
+{{ result.error }}</div>{% endif %}
+<h2>Output files</h2>
+<ul>
+{% for f in (result.files if result else []) %}<li><a href="{{ url_for('download', name=f) }}">{{ f }}</a></li>{% endfor %}
+</ul>
+<form method="post" action="{{ url_for('game_abandon') }}"><button>Back to start</button></form>
+<h2>Play log</h2>
+<div class="log">{% for line in state.log | reverse %}<div>{{ line }}</div>{% endfor %}</div>
+{% endblock %}
