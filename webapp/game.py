@@ -79,6 +79,8 @@ class Game:
         self.log = []            # play-by-play lines shown in the UI
         self.finished = False
         self.output_files = []
+        self.ot_possessions_done = 0
+        self.over = False
         self.last_turn = None
         self.last_quit = None
         self.messages = []
@@ -467,29 +469,61 @@ class Game:
         self._play().TimeOutProcessing(0, 1)
 
     def ot(self):
-        if self.GM['OTFlag'] == 0:
+        """Start the next overtime possession.
+
+        Replaces Play.OTManagement, which the original author flagged as broken
+        (it never cleared the kickoff flag and alternated possession wrongly).
+        College OT as the engine models it: each series gives both teams one
+        possession from the 25; after a complete series the higher score wins;
+        the team that went second starts the next series.
+        """
+        GM, K = self.GM, self.Kicking
+        if GM['OTFlag'] == 0:
             bus.messages.append(("Button Press Infraction", "Only press this button after the 1st OT Possession"))
             return
         p = self._play()
-        p.OTManagement()
+        self.ot_possessions_done += 1
+        if self.ot_possessions_done % 2 == 0:      # series complete
+            bus.results.append("End of OT series %d: %s %d, %s %d" % (
+                GM['OTSeries'], self.homeTeamName, GM['HomeTeamScore'],
+                self.visitingTeamName, GM['VisitingTeamScore']))
+            if GM['HomeTeamScore'] != GM['VisitingTeamScore']:
+                bus.messages.append(("Game Over", "Press Quit / compile stats"))
+                self.over = True
+            GM['OTSeries'] += 1                     # loser of the toss starts the next series: no CoP
+        else:
+            p.CoP()                                 # second possession of the series
+        GM['YardLine'], GM['AdjustedYardLine'] = 75, 25
+        GM['Down'], GM['YTG'] = 1, 10
+        GM['CoPFlag'] = GM['ConversionFlag'] = GM['TDFlag'] = 0
+        K['KickoffFlag'] = K['KickFlag'] = 0
+        bus.board["ot_series"] = str(GM['OTSeries'])
+        p.OnOffenseIndication()
         p.DisplayManagement()
+        p.TGraphics()
 
     # -------------------------------------------------------------- autoplay
     def game_over(self):
-        return any("Game Over" in m[0] or "Game Over" in m[1] for m in self.messages)
+        return self.over or any("Game Over" in m[0] or "Game Over" in m[1] for m in self.messages)
 
     def auto_action(self):
         """A naive coach: kick when required, punt or try a FG on 4th and long."""
-        gm = self.GM
+        gm, k = self.GM, self.Kicking
+        if gm['OTFlag'] == 1:
+            last = self.journal[-1][0] if self.journal else ""
+            if last == "fg" or k['KickoffFlag'] == 1 or gm['CoPFlag'] == 1:
+                return "ot"                       # possession over: FG try, conversion done, or turnover
+            if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
+                return "go_for_two" if gm['OTSeries'] >= 3 else "xpt"
+            if gm['Down'] == 4 and gm['YTG'] > 2 and gm['YardLine'] >= 65:
+                return "fg"
+            return "call_play"                    # never punt in OT
         if gm['ConversionFlag'] == 1 or gm['TDFlag'] == 1:
             return "xpt"
-        if self.Kicking['KickoffFlag'] == 1 or (gm['Quarter'] in (1, 3) and gm['TimeLeftinQuarter'] == 900):
+        if k['KickoffFlag'] == 1 or (gm['Quarter'] in (1, 3) and gm['TimeLeftinQuarter'] == 900):
             return "kickoff"
         if gm['Down'] == 4 and gm['YTG'] > 2:
             return "fg" if gm['YardLine'] >= 65 else "punt"
-        if gm['OTFlag'] == 1 and gm['Down'] == 1 and gm['YardLine'] == 75 and gm['OTPossession'] > 1 \
-                and not bus.board.get("play_call"):
-            return "ot"
         return "call_play"
 
     def autoplay(self, max_actions=400):

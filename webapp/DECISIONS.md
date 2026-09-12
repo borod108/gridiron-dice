@@ -100,3 +100,15 @@ Recorded so they can be revisited. Numbered for reference.
     stays diff-free against the desktop code. Caught only on the server:
     local testing was on 3.10, so `simulate.py` is now also run on the
     instance after every push (see push.sh).
+19. **Overtime handled by the controller, not `Play.OTManagement`.** The
+    engine's OT button handler (flagged "seems broken" by the author in 2021)
+    never cleared the kickoff flag after a conversion, so Call Play was
+    refused and the game could not proceed, and it alternated possession
+    incorrectly. `Game.ot()` now implements the series logic itself using the
+    engine's own `CoP()` and display code: both teams get a possession from
+    the 25 per series, the higher score after a complete series wins, the
+    team that went second starts the next series, and from series 3 the
+    controller already forces two-point tries. The engine file is unchanged.
+    The auto-play coach never punts in OT and presses OT after a conversion,
+    a turnover or a field-goal try. Verified with a tied game that previously
+    looped forever.

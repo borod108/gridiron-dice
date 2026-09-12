@@ -15,7 +15,7 @@ sys.path.insert(0, HERE)
 def run_one(home, visitor, seed, verbose=False):
     import game
     random.seed(seed)
-    g = game.Game(home, visitor)
+    g = game.Game(home, visitor, seed=seed)
     errors = []
     steps = 0
     while steps < 400 and not g.game_over():
