@@ -41,7 +41,7 @@
 </style>
 </head>
 <body>
-<nav><a href="{{ url_for('index') }}">Data &amp; teams</a> <a href="{{ url_for('game_page') }}">Game</a></nav>
+<nav><a href="{{ url_for('index') }}">Data &amp; teams</a> <a href="{{ url_for('game_page') }}">Game</a> <a href="{{ url_for('history_page') }}">History</a></nav>
 {% with msgs = get_flashed_messages() %}{% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}{% endwith %}
 {% block body %}{% endblock %}
 </body>

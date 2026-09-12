@@ -200,7 +200,6 @@ class PickAPlayer:
 #just computed.  This will identify the defensive player who made the sack.  Keep parsing
 #through the list of potential sackers until the random value is less than the player's 
 #cumulative probability of making a sack
-            print(dice1)
             while dice1 >= int(self.wsDefense.cell(row = self.SacksStartRow,
                                             column=SackerProbColumn).value):
                 self.SacksStartRow += 1 

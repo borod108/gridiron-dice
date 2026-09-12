@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Game history{% endblock %}
+{% block body %}
+<h1>Game history</h1>
+<h2>Standings</h2>
+{% if not standings %}<p class="muted">No finished games yet.</p>{% else %}
+<table><tr><th>Team</th><th>W</th><th>L</th><th>T</th><th>Games</th><th>PF</th><th>PA</th></tr>
+{% for t in standings %}<tr><td>{{ t.team }}</td><td>{{ t.w }}</td><td>{{ t.l }}</td><td>{{ t.t }}</td><td>{{ t.games }}</td><td>{{ t.pf }}</td><td>{{ t.pa }}</td></tr>{% endfor %}
+</table>{% endif %}
+<h2>Games</h2>
+{% if not games %}<p class="muted">No games yet.</p>{% else %}
+<table><tr><th>Started</th><th>Home</th><th>Visitor</th><th>Score</th><th>Status</th><th>Plays</th><th></th></tr>
+{% for g in games %}<tr>
+  <td><a href="{{ url_for('history_game', gid=g.id) }}">{{ g.started | replace('T', ' ') }}</a></td>
+  <td>{{ g.home }}</td><td>{{ g.visitor }}</td>
+  <td>{% if g.status == 'finished' %}{{ g.home_score }} – {{ g.visitor_score }}{% else %}—{% endif %}</td>
+  <td>{{ g.status | replace('_', ' ') }}</td><td>{{ g.plays }}</td>
+  <td><form class="inline" method="post" action="{{ url_for('history_delete', gid=g.id) }}" onsubmit="return confirm('Delete this game and its files?')"><button class="btn-small">Delete</button></form></td>
+</tr>{% endfor %}
+</table>{% endif %}
+{% endblock %}

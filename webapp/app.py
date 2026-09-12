@@ -21,6 +21,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.chdir(DATA_DIR)   # the engine reads/writes workbooks relative to cwd
 
 import game  # noqa: E402  (after chdir so nothing else depends on cwd)
+import history  # noqa: E402
 
 app = Flask(__name__, template_folder=os.path.join(HERE, "templates"),
             static_folder=os.path.join(HERE, "static"))
@@ -60,7 +61,7 @@ def list_files():
     out = []
     for f in sorted(os.listdir(DATA_DIR), key=str.lower):
         p = os.path.join(DATA_DIR, f)
-        if not os.path.isfile(p) or f.startswith("."):
+        if not os.path.isfile(p) or f.startswith(".") or f == history.DB_NAME:
             continue
         st = os.stat(p)
         kind = "team"
@@ -194,9 +195,46 @@ def game_end():
 @app.route("/game/abandon", methods=["POST"])
 def game_abandon():
     with LOCK:
+        g = current_game()
+        if g is not None and not g.finished:
+            g.abandon()
+            flash("Game discarded")
         STATE["game"] = None
-    flash("Game discarded")
     return redirect(url_for("index"))
+
+
+# ------------------------------------------------------------------ routes: history
+@app.route("/history")
+def history_page():
+    return render_template("history.html", games=history.list_games(), standings=history.standings())
+
+
+@app.route("/history/<gid>")
+def history_game(gid):
+    g = history.get_game(gid)
+    if g is None:
+        abort(404)
+    return render_template("history_game.html", g=g)
+
+
+@app.route("/history/<gid>/delete", methods=["POST"])
+def history_delete(gid):
+    cur = current_game()
+    if cur is not None and cur.id == gid and not cur.finished:
+        flash("That game is in progress")
+        return redirect(url_for("history_page"))
+    history.delete_game(gid)
+    flash("Deleted game %s" % gid)
+    return redirect(url_for("history_page"))
+
+
+@app.route("/games/<gid>/<path:name>")
+def game_file(gid, name):
+    name = clean_name(name)
+    d = os.path.join(DATA_DIR, history.game_dir(gid))
+    if not name or ".." in gid or "/" in gid or not os.path.isfile(os.path.join(d, name)):
+        abort(404)
+    return send_from_directory(d, name, as_attachment=True)
 
 
 @app.route("/healthz")

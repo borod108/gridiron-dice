@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ g.home }} vs {{ g.visitor }}{% endblock %}
+{% block body %}
+<h1>{{ g.home }} {{ g.home_score if g.home_score is not none else '' }} – {{ g.visitor }} {{ g.visitor_score if g.visitor_score is not none else '' }}</h1>
+<p class="muted">Started {{ g.started | replace('T', ' ') }}{% if g.ended %}, ended {{ g.ended | replace('T', ' ') }}{% endif %} · {{ g.status | replace('_', ' ') }} · {{ g.plays }} plays · id {{ g.id }}</p>
+<h2>Files</h2>
+{% if not g.files %}<p class="muted">No files.</p>{% else %}
+<ul>{% for f in g.files %}<li><a href="{{ url_for('game_file', gid=g.id, name=f) }}">{{ f }}</a></li>{% endfor %}</ul>{% endif %}
+<h2>Play log</h2>
+<div class="log">{% for line in g.log %}<div>{{ line }}</div>{% endfor %}</div>
+<p><a href="{{ url_for('history_page') }}">Back to history</a></p>
+{% endblock %}

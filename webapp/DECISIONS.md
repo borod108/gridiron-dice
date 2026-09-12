@@ -55,3 +55,14 @@ Recorded so they can be revisited. Numbered for reference.
 
 ## Deployment record
 - 2026-09-12: provisioned instance `i-07e5314e860f11b8c`, security group `sg-087269b314ba5cc50`, Elastic IP `100.57.107.111` (allocation `eipalloc-0497ba4fa550e4de0`), key `~/.ssh/rick-web-key.pem`. URL http://100.57.107.111/ . Credentials in `deploy/.env`.
+
+## Improvements round 1 (2026-09-12, after first deploy)
+
+13. **Game history in SQLite + one folder per game.** `history.py` keeps
+    `history.sqlite` in the data dir and `games/<id>/` holds the six output
+    workbooks of each finished game, so games between the same teams no longer
+    overwrite each other. Game id = timestamp + team names. The History page
+    lists games, standings (W/L/T, points for/against) and per-game play logs.
+    Abandoned games are recorded too (status only). The engine's scratch
+    `*Log.xlsx` files are deleted at quit; they are recreated on every start.
+    SQLite chosen over JSON files for cheap standings queries; no ORM.

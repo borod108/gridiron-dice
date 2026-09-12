@@ -26,6 +26,7 @@ import LogPlays                                 # noqa: E402
 import PickAPlayer                              # noqa: E402
 import Play                                     # noqa: E402
 import random                                   # noqa: E402
+import history                                  # noqa: E402
 
 OUTPUT_SUFFIXES = ("Log.xlsx", "log.xlsx", "Stats.xlsx", "DStats.xlsx")
 
@@ -77,6 +78,8 @@ class Game:
         self.last_turn = None
         self.last_quit = None
         self.messages = []
+        self.id = history.new_id(home, visitor)
+        history.start(self.id, home, visitor)
         bus.reset_all()
         self._start_game()
 
@@ -424,11 +427,18 @@ class Game:
         except Exception:
             error = traceback.format_exc()
         self.finished = True
-        self.output_files = [f for f in (
-            self.homeTeamName + "Stats.xlsx", self.homeTeamName + "DStats.xlsx",
-            self.visitingTeamName + "Stats.xlsx", self.visitingTeamName + "DStats.xlsx",
-            self.HomeTeamLogName, self.VisitingTeamLogName) if os.path.exists(f)]
-        return {"final_score": self.final_score, "files": self.output_files, "error": error}
+        outputs = (self.homeTeamName + "Stats.xlsx", self.homeTeamName + "DStats.xlsx",
+                   self.visitingTeamName + "Stats.xlsx", self.visitingTeamName + "DStats.xlsx",
+                   self.HomeTeamLogName, self.VisitingTeamLogName)
+        # keep the outputs: move them into games/<id>/ so the next game does not overwrite them
+        self.output_files = history.finish(self.id, GM['HomeTeamScore'], GM['VisitingTeamScore'], self.log, outputs)
+        for scratch in (self.homeTeamName + "Log.xlsx", self.visitingTeamName + "Log.xlsx"):
+            if os.path.exists(scratch):   # engine scratch logs, recreated by every start
+                os.remove(scratch)
+        return {"final_score": self.final_score, "files": self.output_files, "error": error, "id": self.id}
+
+    def abandon(self):
+        history.abandon(self.id, self.log)
 
     # ------------------------------------------------------------------ state
     def state(self):
@@ -449,5 +459,5 @@ class Game:
             "play_call": b.get("play_call", ""), "last_result": b.get("last_result", ""),
             "ball_yardline": bus.ball["yardline"], "ball_offense_flag": bus.ball["offense_flag"],
             "boxes": dict(self.boxes), "log": list(self.log), "messages": list(self.messages),
-            "finished": self.finished,
+            "finished": self.finished, "id": self.id,
         }

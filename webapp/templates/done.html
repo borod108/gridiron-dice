@@ -5,8 +5,9 @@
 {{ result.error }}</div>{% endif %}
 <h2>Output files</h2>
 <ul>
-{% for f in (result.files if result else []) %}<li><a href="{{ url_for('download', name=f) }}">{{ f }}</a></li>{% endfor %}
+{% for f in (result.files if result else []) %}<li><a href="{{ url_for('game_file', gid=state.id, name=f) }}">{{ f }}</a></li>{% endfor %}
 </ul>
+<p>Saved under <a href="{{ url_for('history_page') }}">History</a>.</p>
 <form method="post" action="{{ url_for('game_abandon') }}"><button>Back to start</button></form>
 <h2>Play log</h2>
 <div class="log">{% for line in state.log | reverse %}<div>{{ line }}</div>{% endfor %}</div>
