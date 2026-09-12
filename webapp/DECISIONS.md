@@ -66,3 +66,13 @@ Recorded so they can be revisited. Numbered for reference.
     Abandoned games are recorded too (status only). The engine's scratch
     `*Log.xlsx` files are deleted at quit; they are recreated on every start.
     SQLite chosen over JSON files for cheap standings queries; no ORM.
+14. **Reproducible games via a seeded journal.** The engine draws every random
+    number from Python's global `random`, so `Game` seeds it once and appends
+    every button press (action + checked boxes) to `games/<id>/journal.json`.
+    Replaying the journal rebuilds the identical game. This gives (a) resume
+    of the in-progress game after a restart or redeploy and (b) an Undo button
+    that replays all but the last action. Chosen over pickling the engine state
+    because the state is spread across openpyxl worksheets and module globals.
+    Cost: undo replays the whole game (well under a second for a full game).
+    Any future change to the engine's random call sequence invalidates old
+    journals, which only matters for games in progress at the time.

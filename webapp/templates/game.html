@@ -54,6 +54,7 @@
 </form>
 
 <div class="row" style="margin-top:8px">
+  <form method="post" action="{{ url_for('game_undo') }}"><button {% if not state.can_undo %}disabled{% endif %}>Undo last action</button></form>
   <form method="post" action="{{ url_for('game_end') }}" onsubmit="return confirm('End the game and compile stats?')"><button>Quit / compile stats</button></form>
   <form method="post" action="{{ url_for('game_abandon') }}" onsubmit="return confirm('Discard this game without compiling stats?')"><button>Abandon game</button></form>
 </div>

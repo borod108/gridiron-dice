@@ -29,6 +29,10 @@ app.secret_key = os.environ.get("RICK_SECRET", secrets.token_hex(16))
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 STATE = {"game": None}
+try:   # rebuild the game that was in progress before the last restart
+    STATE["game"] = game.Game.resume_latest()
+except Exception as e:  # never block startup on a bad journal
+    app.logger.warning("could not resume game: %s", e)
 LOCK = threading.Lock()
 ALLOWED_EXT = (".xlsx", ".txt")
 SAFE_NAME = re.compile(r"[^A-Za-z0-9 _.\-]")
@@ -176,6 +180,20 @@ def game_action():
             return redirect(url_for("index"))
         try:
             g.last_turn = g.do(action, boxes)
+        except game.GameError as e:
+            flash(str(e))
+    return redirect(url_for("game_page"))
+
+
+@app.route("/game/undo", methods=["POST"])
+def game_undo():
+    with LOCK:
+        g = current_game()
+        if g is None or g.finished:
+            return redirect(url_for("index"))
+        try:
+            STATE["game"] = g.undo()
+            flash("Undid the last action")
         except game.GameError as e:
             flash(str(e))
     return redirect(url_for("game_page"))

@@ -10,7 +10,10 @@ All Excel I/O in the engine uses paths relative to the current working
 directory, exactly like the desktop app, so the web server chdir()s into the
 data directory once at startup.
 """
+import glob
+import json
 import os
+import secrets
 import sys
 import traceback
 
@@ -63,7 +66,7 @@ class GameError(Exception):
 class Game:
     """One game in progress.  Construct = press Start."""
 
-    def __init__(self, home, visitor):
+    def __init__(self, home, visitor, seed=None, gid=None):
         if home == visitor:
             raise GameError("Home and visiting team must differ")
         for t in (home, visitor):
@@ -78,10 +81,72 @@ class Game:
         self.last_turn = None
         self.last_quit = None
         self.messages = []
-        self.id = history.new_id(home, visitor)
+        self.id = gid or history.new_id(home, visitor)
         history.start(self.id, home, visitor)
+        # Every random number the engine draws comes from the global `random`
+        # module, so seeding it here and journaling each button press makes the
+        # whole game reproducible: see replay(), undo() and resume_latest().
+        self.seed = seed if seed is not None else secrets.randbits(63)
+        self.journal = []
+        self._replaying = False
+        random.seed(self.seed)
         bus.reset_all()
         self._start_game()
+        self.save_journal("in_progress")
+
+    # ---------------------------------------------------------------- journal
+    JOURNAL = "journal.json"
+
+    def journal_path(self):
+        return os.path.join(history.game_dir(self.id), self.JOURNAL)
+
+    def save_journal(self, status):
+        if self._replaying:
+            return
+        os.makedirs(history.game_dir(self.id), exist_ok=True)
+        tmp = self.journal_path() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"id": self.id, "home": self.homeTeamName, "visitor": self.visitingTeamName,
+                       "seed": self.seed, "status": status, "actions": self.journal}, f)
+        os.replace(tmp, self.journal_path())
+
+    @classmethod
+    def replay(cls, j, upto=None):
+        """Rebuild a game from a journal dict, applying its first `upto` actions."""
+        g = cls(j["home"], j["visitor"], seed=j["seed"], gid=j["id"])
+        g._replaying = True
+        try:
+            for action, boxes in j["actions"][:upto]:
+                g.last_turn = g.do(action, {k: 1 for k in boxes})
+        finally:
+            g._replaying = False
+        g.save_journal("in_progress")
+        return g
+
+    def undo(self):
+        """Return a new Game equal to this one minus its last action."""
+        if not self.journal:
+            raise GameError("Nothing to undo")
+        j = {"id": self.id, "home": self.homeTeamName, "visitor": self.visitingTeamName,
+             "seed": self.seed, "actions": self.journal[:-1]}
+        return Game.replay(j)
+
+    @classmethod
+    def resume_latest(cls):
+        """After a restart: rebuild the most recent in-progress game, if any."""
+        candidates = []
+        for path in glob.glob(os.path.join(history.GAMES_DIR, "*", cls.JOURNAL)):
+            try:
+                with open(path) as f:
+                    j = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if j.get("status") == "in_progress":
+                candidates.append(j)
+        if not candidates:
+            return None
+        j = max(candidates, key=lambda j: j["id"])
+        return cls.replay(j)
 
     # ------------------------------------------------------------------ setup
     def _load(self, name):
@@ -231,6 +296,8 @@ class Game:
             raise GameError("Unknown action %s" % action)
         for k in self.boxes:
             self.boxes[k] = 1 if boxes.get(k) else 0
+        self.journal.append([action, sorted(k for k in self.boxes if self.boxes[k])])
+        self.save_journal("in_progress")
         bus.reset_turn()
         error = None
         try:
@@ -435,10 +502,12 @@ class Game:
         for scratch in (self.homeTeamName + "Log.xlsx", self.visitingTeamName + "Log.xlsx"):
             if os.path.exists(scratch):   # engine scratch logs, recreated by every start
                 os.remove(scratch)
+        self.save_journal("finished")
         return {"final_score": self.final_score, "files": self.output_files, "error": error, "id": self.id}
 
     def abandon(self):
         history.abandon(self.id, self.log)
+        self.save_journal("abandoned")
 
     # ------------------------------------------------------------------ state
     def state(self):
@@ -459,5 +528,5 @@ class Game:
             "play_call": b.get("play_call", ""), "last_result": b.get("last_result", ""),
             "ball_yardline": bus.ball["yardline"], "ball_offense_flag": bus.ball["offense_flag"],
             "boxes": dict(self.boxes), "log": list(self.log), "messages": list(self.messages),
-            "finished": self.finished, "id": self.id,
+            "finished": self.finished, "id": self.id, "can_undo": bool(self.journal),
         }

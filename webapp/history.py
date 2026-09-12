@@ -55,7 +55,7 @@ def game_dir(gid):
 def start(gid, home, visitor):
     os.makedirs(game_dir(gid), exist_ok=True)
     with _db() as con:
-        con.execute("INSERT OR REPLACE INTO games (id, started, home, visitor, status) VALUES (?,?,?,?,?)",
+        con.execute("INSERT OR IGNORE INTO games (id, started, home, visitor, status) VALUES (?,?,?,?,?)",
                     (gid, datetime.now().isoformat(timespec="seconds"), home, visitor, "in_progress"))
 
 
