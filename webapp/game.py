@@ -670,14 +670,18 @@ class Game:
                    self.HomeTeamLogName, self.VisitingTeamLogName)
         # keep the outputs: move them into games/<id>/ so the next game does not overwrite them
         self.output_files = history.finish(self.id, GM['HomeTeamScore'], GM['VisitingTeamScore'], self.log, outputs)
-        for scratch in (self.homeTeamName + "Log.xlsx", self.visitingTeamName + "Log.xlsx"):
-            if os.path.exists(scratch):   # engine scratch logs, recreated by every start
-                os.remove(scratch)
+        self._remove_scratch_logs()
         self.save_journal("finished")
         return {"final_score": self.final_score, "files": self.output_files, "error": error, "id": self.id}
 
+    def _remove_scratch_logs(self):
+        for scratch in (self.homeTeamName + "Log.xlsx", self.visitingTeamName + "Log.xlsx"):
+            if os.path.exists(scratch):   # engine scratch logs, recreated by every start
+                os.remove(scratch)
+
     def abandon(self):
         history.abandon(self.id, self.log)
+        self._remove_scratch_logs()
         self.save_journal("abandoned")
 
     # ------------------------------------------------------------------ state
